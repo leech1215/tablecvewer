@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TableViewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background-color: #f8f8f8;
+            padding: 15px 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #333;
+            margin: 0;
+        }
+
+        .button-container {
+            display: flex;
+            gap: 15px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 4px;
+            background-color: white;
+            color: black;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #e0e0e0;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 80px;
+        }
+
+        td, th {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+            width: 100px;
+            height: 200px;
+            position: relative;
+        }
+
+        img {
+            width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .cell-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+
+        .checkbox-container {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>TableViewer</h1>
+        <div class="button-container">
+            <button id="resetButton">Reset</button>
+            <button id="deleteButton" class="delete-button" style="display:none;">삭제</button>
+            <button id="folderButton">폴더 선택</button>
+        </div>
+    </div>
+
+    <table id="myTable">
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    </table>
+
+    <script>
+        const folderInput = document.createElement('input');
+        folderInput.type = 'file';
+        folderInput.webkitdirectory = true;
+        folderInput.directory = true;
+        folderInput.style.display = 'none';
+        document.body.appendChild(folderInput);
+
+        const folderButton = document.getElementById('folderButton');
+        folderButton.addEventListener('click', () => folderInput.click());
+
+        folderInput.addEventListener('change', handleFileSelection);
+
+        window.onload = function() {
+            const savedTable = localStorage.getItem('tableData');
+            if (savedTable) {
+                document.getElementById('myTable').innerHTML = savedTable;
+                attachClickEvents(); // 클릭 이벤트 복원
+            }
+        };
+
+        function handleFileSelection(event) {
+            const files = event.target.files;
+            const folderData = {};
+
+            for (const file of files) {
+                const folderPath = file.webkitRelativePath.split('/')[0];
+                if (!folderData[folderPath]) {
+                    folderData[folderPath] = {
+                        name: folderPath,
+                        image: null,
+                        link: `saved file/${folderPath}/image_viewer.html`
+                    };
+                }
+
+                if (file.name === '표지.jpg') {
+                    readFile(file, folderPath);
+                }
+            }
+        }
+
+        function readFile(file, folderPath) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const imageUrl = event.target.result;
+                addCell(folderPath, imageUrl);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function addCell(folderName, imageUrl) {
+            const table = document.getElementById('myTable');
+            const maxCols = 10;
+            let filled = false;
+
+            for (let row of table.rows) {
+                if (filled) break;
+                for (let cell of row.cells) {
+                    if (cell.innerHTML === '') {
+                        const content = createCellContent(folderName, imageUrl);
+                        cell.appendChild(content);
+                        filled = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!filled) {
+                const newRow = table.insertRow();
+                for (let i = 0; i < maxCols; i++) {
+                    const newCell = newRow.insertCell();
+                    if (i === 0) {  // 첫 번째 셀에만 추가
+                        const content = createCellContent(folderName, imageUrl);
+                        newCell.appendChild(content);
+                    }
+                }
+            }
+
+            localStorage.setItem('tableData', table.innerHTML);
+        }
+
+        function createCellContent(folderName, imageUrl) {
+            const content = document.createElement('div');
+            content.className = 'cell-content';
+
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.alt = '이미지';
+
+            const span = document.createElement('span');
+            span.textContent = folderName;
+
+            content.appendChild(img);
+            content.appendChild(span);
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'cell-checkbox';
+            checkbox.addEventListener('change', toggleDeleteButton);
+
+            const checkboxContainer = document.createElement('div');
+            checkboxContainer.className = 'checkbox-container';
+            checkboxContainer.appendChild(checkbox);
+            content.appendChild(checkboxContainer);
+
+            content.onclick = function (event) {
+                if (event.target !== checkbox) {
+                    window.location.href = `saved file/${folderName}/image_viewer.html`;
+                }
+            };
+
+            return content;
+        }
+
+        function toggleDeleteButton() {
+            const checkboxes = document.querySelectorAll('.cell-checkbox');
+            const deleteButton = document.getElementById('deleteButton');
+            let anyChecked = false;
+
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    anyChecked = true;
+                }
+            });
+
+            deleteButton.style.display = anyChecked ? 'inline-block' : 'none';
+        }
+
+        document.getElementById('deleteButton').addEventListener('click', () => {
+            const checkboxes = document.querySelectorAll('.cell-checkbox');
+            checkboxes.forEach((checkbox) => {
+                if (checkbox.checked) {
+                    const cell = checkbox.closest('td');
+                    cell.innerHTML = '';
+                }
+            });
+
+            const deleteButton = document.getElementById('deleteButton');
+            deleteButton.style.display = 'none';
+            localStorage.setItem('tableData', document.getElementById('myTable').innerHTML);
+        });
+
+        document.getElementById('resetButton').addEventListener('click', () => {
+            const table = document.getElementById('myTable');
+            table.innerHTML = '<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+            localStorage.removeItem('tableData');
+            document.getElementById('deleteButton').style.display = 'none';
+        });
+
+        // 클릭 이벤트를 테이블의 모든 셀에 복원
+        function attachClickEvents() {
+            const cells = document.querySelectorAll('td');
+            cells.forEach(cell => {
+                const checkbox = cell.querySelector('.cell-checkbox');
+                if (checkbox) {
+                    cell.onclick = function (event) {
+                        if (event.target !== checkbox) {
+                            const folderName = cell.querySelector('span').textContent;
+                            window.location.href = `saved file/${folderName}/image_viewer.html`;
+                        }
+                    };
+                }
+            });
+        }
+    </script>
+</body>
+</html>
